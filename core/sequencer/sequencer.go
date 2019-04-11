@@ -37,7 +37,6 @@ import (
 type Sequencer struct {
 	directories     directory.Storage
 	mapAdmin        tpb.TrillianAdminClient
-	batchSize       int32
 	sequencerClient spb.KeyTransparencySequencerClient
 }
 
@@ -47,13 +46,11 @@ func New(
 	mapAdmin tpb.TrillianAdminClient,
 	directories directory.Storage,
 	mutations mutator.MutationStorage,
-	batchSize int,
 ) *Sequencer {
 	return &Sequencer{
 		sequencerClient: sequencerClient,
 		directories:     directories,
 		mapAdmin:        mapAdmin,
-		batchSize:       int32(batchSize),
 	}
 }
 
@@ -121,7 +118,7 @@ func PeriodicallyRun(ctx context.Context, tickch <-chan time.Time, f func(ctx co
 
 // RunBatchForAllDirectories scans the directories table for new directories and creates new receivers for
 // directories that the sequencer is not currently receiving for.
-func (s *Sequencer) RunBatchForAllDirectories(ctx context.Context) error {
+func (s *Sequencer) RunBatchForAllDirectories(ctx context.Context, batchSize int32) error {
 	directories, err := s.directories.List(ctx, false)
 	if err != nil {
 		return fmt.Errorf("admin.List(): %v", err)
@@ -131,7 +128,7 @@ func (s *Sequencer) RunBatchForAllDirectories(ctx context.Context) error {
 		if _, err := s.sequencerClient.RunBatch(ctx, &spb.RunBatchRequest{
 			DirectoryId: d.DirectoryID,
 			MinBatch:    1,
-			MaxBatch:    s.batchSize,
+			MaxBatch:    batchSize,
 		}); err != nil {
 			return err
 		}
